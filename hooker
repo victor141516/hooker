@@ -1,0 +1,60 @@
+#!/bin/sh
+
+if [ "$1" == "remove" ]; then
+    if [ ! -f .git/.hooker-installed ]; then
+        echo "Not installed!"
+        exit
+    fi
+    rm -rf .git/hooks .git/.hooker-installed
+    mv .git/hooks.old .git/hooks
+    echo "Uninstalled!"
+    exit
+fi
+
+if [ ! -e .git ]; then
+    echo "This is not a Git repo!"
+    exit
+fi
+
+if [ ! -e .hooks ]; then
+    echo "No .hooks directory found!"
+    exit
+fi
+
+if [ ! -f .git/.hooker-installed ]; then  # Initial installation
+    mv .git/hooks .git/hooks.old
+    mkdir .git/hooks
+    cp $0 .git/hooks/post-merge
+    cp $0 .git/hooks/pre-commit
+    touch .git/.hooker-installed
+fi
+
+if [ -f .hooks/post-merge ]; then  # Prepare hooks for repo post-merge hook
+    mv .git/hooks/post-merge .git/hooks/post-merge.1
+fi
+
+if [ -f .hooks/pre-commit ]; then  # Prepare hooks for repo pre-commit hook
+    mv .git/hooks/pre-commit .git/hooks/pre-commit.1
+fi
+
+cp .hooks/* .git/hooks  # Copy repo hooks to .git hooks
+
+if [ -f .git/hooks/post-merge.1 ]; then  # Restore this script as post-merge
+    mv .git/hooks/post-merge .git/hooks/post-merge.2
+    mv .git/hooks/post-merge.1 .git/hooks/post-merge
+fi
+
+if [ -f .git/hooks/pre-commit.1 ]; then  # Restore this script as pre-commit
+    mv .git/hooks/pre-commit .git/hooks/pre-commit.2
+    mv .git/hooks/pre-commit.1 .git/hooks/pre-commit
+fi
+
+chown -R $UID:$GID .git/hooks  # User owns hook files
+
+if [[ "$0" == ".git/hooks/"* ]]; then  # Called from hook (not installing)
+    if [ -f "$0.2" ]; then  # Run seconday (user) script
+        exec "$0.2"
+    fi
+else
+    echo "Intalled!"
+fi
